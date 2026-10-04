@@ -123,12 +123,16 @@ app.whenReady().then(async () => {
       const finalNote = note + '\n종료 직전 저장 검증';
       await evaluate(`document.querySelector('.snapshot-card textarea').value=${JSON.stringify(finalNote)}; document.querySelector('.snapshot-card textarea').dispatchEvent(new Event('input',{bubbles:true}))`);
       const closed = new Promise(resolve => win.once('closed', resolve));
+      const quitting = process.platform === 'win32' ? new Promise(resolve => app.once('before-quit', resolve)) : null;
       holdQuitForCloseChecks = true;
       win.close();
       await Promise.race([closed, new Promise((_, reject) => setTimeout(() => reject(new Error('Close flush timed out')), 10000))]);
       const finalState = JSON.parse(fs.readFileSync(path.join(savedDirectory, 'workspace_data.json'), 'utf8'));
       assert.equal(finalState.snapshots[0].note, finalNote);
-      if (process.platform === 'win32') assert.equal(quitRequested, true, 'Windows requested normal app shutdown');
+      if (quitting) {
+        await Promise.race([quitting, new Promise((_, reject) => setTimeout(() => reject(new Error('Windows quit event timed out')), 10000))]);
+        assert.equal(quitRequested, true, 'Windows requested normal app shutdown');
+      }
       holdQuitForCloseChecks = false;
     }
     console.log(JSON.stringify({ status: 'PASS', checks: ['isolated renderer', 'local libraries', 'special-character filenames', 'HH:MM:SS formatting', 'duration bounds', 'seek to 5 seconds', 'offline playback advances and pause stops it', '2x playback rate', 'fullscreen enter and exit', 'offline capture and black-border crop', 'HTML treated as text', 'offline multipage PDF', 'Korean/emoji notes', 'reset and restore', 'drawing save and reopen', ...(process.env.VIDEOPDF_KEEP_SMOKE === '1' ? [] : ['missing image note retained, new capture and PDF succeed', 'capture without crop', 'save before close'])], pdf, screenshot, temporary }));
