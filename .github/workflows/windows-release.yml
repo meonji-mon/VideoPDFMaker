@@ -1,0 +1,65 @@
+name: Verify and build Windows
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    runs-on: windows-2025
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install build and test dependencies
+        run: |
+          npm ci
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          choco install ffmpeg --yes --no-progress --limit-output
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Run regression tests
+        run: npm test
+      - name: Verify offline Electron flows on Windows
+        run: npm run test:electron
+      - name: Build installer and portable executable
+        run: npm run build:win -- --publish never
+      - name: Verify the packaged application code offline
+        run: |
+          $env:VIDEOPDF_APP_MAIN = Join-Path (Resolve-Path 'dist/win-unpacked/resources').Path 'app.asar/main.js'
+          npm run test:electron
+      - name: Test installer, installed startup and portable startup
+        run: ./scripts/verify-windows.ps1
+      - name: Generate checksums
+        run: |
+          Get-ChildItem 'dist/VideoPDFMaker-*.exe' | Sort-Object Name | ForEach-Object {
+            $hash = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+            "$hash  $($_.Name)"
+          } | Set-Content 'dist/SHA256SUMS.txt' -Encoding ascii
+      - name: Upload verified distribution
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: windows-x64-distribution
+          path: |
+            dist/VideoPDFMaker-*.exe
+            dist/SHA256SUMS.txt
+            dist/windows-verification.json
+          compression-level: 0
+          if-no-files-found: error
+      - name: Upload test evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: windows-test-evidence
+          path: .codex/screenshots/
+          include-hidden-files: true
+          if-no-files-found: ignore

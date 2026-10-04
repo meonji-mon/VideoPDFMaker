@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; media-src 'self' file:; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- Tailwind CSS (Offline Local) -->
+  <script src="./assets/js/tailwindcss.js"></script>
+
+  <!-- Pretendard Font (Offline Local) -->
+  <link rel="stylesheet" href="./assets/css/pretendard.css" />
+
+  <!-- Phosphor Icons (Offline Local) -->
+  <link rel="stylesheet" href="./assets/vendor/phosphor/regular/style.css" />
+  <link rel="stylesheet" href="./assets/vendor/phosphor/bold/style.css" />
+  <link rel="stylesheet" href="./assets/vendor/phosphor/fill/style.css" />
+  <link rel="stylesheet" href="./assets/vendor/phosphor/duotone/style.css" />
+
+  <!-- jsPDF Library for PDF Generation (Offline Local) -->
+  <script src="./assets/js/jspdf.umd.min.js"></script>
+
+  <script src="./timecode.js"></script>
+
+  <script src="./assets/js/theme.js"></script>
+  <style>
+    button:disabled { opacity: 0.45; cursor: wait; }
+    .fullscreen-player #time-jump-form {
+      position: absolute; bottom: 95px; left: 24px; z-index: 51;
+      background: rgba(255, 255, 255, 0.95); padding: 12px; border-radius: 12px;
+      max-width: calc(100% - 48px);
+    }
+    /* Toss Typography Tokens */
+    .t1 {
+      font-size: 30px;
+      line-height: 40px;
+      font-weight: 700;
+      color: #191F28;
+      letter-spacing: -0.5px;
+    }
+
+    .t2 {
+      font-size: 26px;
+      line-height: 35px;
+      font-weight: 700;
+      color: #191F28;
+      letter-spacing: -0.4px;
+    }
+
+    .t3 {
+      font-size: 22px;
+      line-height: 31px;
+      font-weight: 700;
+      color: #191F28;
+      letter-spacing: -0.3px;
+    }
+
+    .t4 {
+      font-size: 20px;
+      line-height: 29px;
+      font-weight: 700;
+      color: #191F28;
+      letter-spacing: -0.3px;
+    }
+
+    .t5 {
+      font-size: 17px;
+      line-height: 25.5px;
+      font-weight: 600;
+      color: #333D4B;
+    }
+
+    .t6 {
+      font-size: 15px;
+      line-height: 22.5px;
+      font-weight: 500;
+      color: #4E5968;
+    }
+
+    .st10 {
+      font-size: 16px;
+      line-height: 24px;
+      font-weight: 500;
+      color: #4E5968;
+    }
+
+    .st11 {
+      font-size: 14px;
+      line-height: 21px;
+      font-weight: 500;
+      color: #8B95A1;
+    }
+
+    .st12 {
+      font-size: 13px;
+      line-height: 19.5px;
+      font-weight: 500;
+      color: #8B95A1;
+    }
+
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: #D1D6DB;
+      border-radius: 4px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: #8B95A1;
+    }
+
+    .hide-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+
+    .hide-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+
+    body {
+      background-color: #F9FAFB;
+    }
+
+    .toss-card {
+      background-color: #FFFFFF;
+      border-radius: 20px;
+      padding: 24px;
+      border: 1px solid #E5E8EB;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+    }
+
+    /* Flash Animation for Capture */
+    @keyframes flash {
+      0% {
+        opacity: 1;
+        background-color: #ffffff;
+      }
+
+      100% {
+        opacity: 0;
+        background-color: transparent;
+      }
+    }
+
+    .flash-effect {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: white;
+      pointer-events: none;
+      opacity: 0;
+      z-index: 10;
+    }
+
+    .flash-active {
+      animation: flash 0.4s ease-out;
+    }
+
+    /* Video Player Styles */
+    input[type=range] {
+      -webkit-appearance: none;
+      width: 100%;
+      background: transparent;
+    }
+
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      height: 14px;
+      width: 14px;
+      border-radius: 50%;
+      background: #3182F6;
+      cursor: pointer;
+      margin-top: -5px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+    }
+
+    input[type=range]::-webkit-slider-runnable-track {
+      width: 100%;
+      height: 4px;
+      cursor: pointer;
+      background: #E5E8EB;
+      border-radius: 2px;
+    }
+
+    input[type=range]:focus::-webkit-slider-runnable-track {
+      background: #D1D6DB;
+    }
+
+    .dragging {
+      opacity: 0.5;
+      border: 2px dashed #3182F6;
+    }
+
+    .drag-over {
+      border-top: 4px solid #3182F6;
+      padding-top: 20px;
+    }
+
+    /* =========================================
+       전체화면(Cinematic) 전용 CSS 추가 
+       ========================================= */
+    .fullscreen-controls {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      padding: 24px 32px;
+      background: rgba(0, 0, 0, 0.4);
+      /* 반투명 블랙 */
+      backdrop-filter: blur(12px);
+      /* 블러(유리) 효과 */
+      -webkit-backdrop-filter: blur(12px);
+      z-index: 50;
+      transition: opacity 0.4s ease, transform 0.4s ease;
+      opacity: 0;
+      transform: translateY(20px);
+    }
+
+    .fullscreen-controls.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    /* 전체화면 시 아이콘/글자 색상 화이트로 오버라이드 */
+    .fullscreen-player #btn-play-pause,
+    .fullscreen-player #btn-fullscreen {
+      color: white !important;
+    }
+
+    .fullscreen-player #btn-play-pause:hover,
+    .fullscreen-player #btn-fullscreen:hover {
+      background: rgba(255, 255, 255, 0.2) !important;
+    }
+
+    .fullscreen-player #time-current,
+    .fullscreen-player #time-duration {
+      color: rgba(255, 255, 255, 0.9) !important;
+    }
+  </style>
+</head>
+
+<body class="text-toss-grey900 antialiased h-screen flex overflow-hidden">
+
+  <!-- Left Sidebar -->
+  <aside
+    class="w-[80px] h-screen flex-shrink-0 border-r border-toss-grey200 bg-white flex flex-col items-center py-8 z-40">
+    <nav class="flex flex-col gap-5 w-full items-center">
+      <button id="nav-home"
+        class="w-14 h-14 rounded-2xl flex items-center justify-center text-toss-grey900 bg-toss-grey100 transition"
+        title="홈 화면">
+        <i class="ph-fill ph-house text-[28px]"></i>
+      </button>
+      <button id="nav-workspace"
+        class="w-14 h-14 rounded-2xl flex items-center justify-center text-toss-grey500 hover:text-toss-grey900 hover:bg-toss-grey100 transition"
+        title="작업 공간">
+        <i class="ph-fill ph-video-camera text-[28px]"></i>
+      </button>
+    </nav>
+    <div class="mt-auto w-full flex flex-col items-center gap-4">
+      <button
+        class="w-14 h-14 rounded-2xl flex items-center justify-center text-toss-grey500 hover:text-toss-grey900 hover:bg-toss-grey100 transition"
+        title="환경설정">
+        <i class="ph ph-gear text-[28px]"></i>
+      </button>
+    </div>
+  </aside>
+
+  <!-- Main Content Area -->
+  <div class="flex-1 h-screen flex flex-col relative overflow-hidden bg-toss-grey50">
+
+    <!-- Header -->
+    <header class="h-[80px] px-8 flex justify-between items-center border-b border-toss-grey200 bg-white flex-shrink-0">
+      <div class="flex items-center gap-3">
+        <h1 id="header-title" class="t4 font-bold text-toss-grey900"></h1>
+      </div>
+      <div id="header-actions" class="flex gap-3 hidden">
+        <button id="btn-restore" class="hidden px-5 py-2.5 rounded-xl t6 bg-toss-grey100 hover:bg-toss-grey200">보관 목록 복원</button>
+        <button id="btn-reset"
+          class="px-5 py-2.5 rounded-xl t6 font-semibold bg-toss-grey100 text-toss-grey700 hover:bg-toss-grey200 transition">
+          목록 초기화
+        </button>
+        <button id="btn-export-pdf"
+          class="px-6 py-2.5 rounded-xl t6 font-bold bg-toss-blue text-white shadow-sm hover:bg-toss-blueHover transition flex items-center gap-2">
+          <i class="ph-bold ph-export"></i> PDF 내보내기
+        </button>
+      </div>
+    </header>
+
+    <!-- ================== VIEW: HOME ================== -->
+    <main id="view-home" class="flex-1 p-8 overflow-y-auto w-full max-w-7xl mx-auto">
+      <div class="flex justify-between items-end mb-8">
+        <div>
+          <h2 class="t2 font-bold mb-1">내 비디오 라이브러리</h2>
+          <p class="st11 text-toss-grey500">작업할 영상들이 들어있는 메인 폴더를 선택해주세요. (하위 폴더 영상도 찾아냅니다)</p>
+        </div>
+        <button id="btn-select-folder"
+          class="px-5 py-2.5 rounded-xl t6 font-bold bg-toss-blueWeak text-toss-blue hover:bg-[#D3E8FF] transition flex items-center gap-2">
+          <i class="ph-bold ph-folder-open text-lg"></i> 작업 폴더 선택
+        </button>
+
+      </div>
+
+      <!-- Empty State for Home -->
+      <div id="home-empty-state"
+        class="w-full py-24 flex flex-col items-center justify-center border-2 border-dashed border-toss-grey200 rounded-2xl bg-white">
+        <div class="w-16 h-16 bg-toss-grey100 rounded-full flex items-center justify-center text-toss-grey400 mb-4">
+          <i class="ph-fill ph-folder-open text-3xl"></i>
+        </div>
+        <h3 class="t4 mb-2">선택된 작업 폴더가 없습니다</h3>
+        <p class="st12 text-toss-grey500 text-center">우측 상단의 '작업 폴더 선택' 버튼을 눌러<br>영상(MP4)이 들어있는 폴더를 지정해주세요.</p>
+      </div>
+
+      <!-- Video Grid -->
+      <div id="video-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 hidden">
+        <!-- Videos will be injected here -->
+      </div>
+    </main>
+
+
+    <!-- ================== VIEW: WORKSPACE ================== -->
+    <main id="view-workspace" class="flex-1 p-6 grid-cols-12 gap-6 min-h-0 overflow-hidden hidden">
+
+      <!-- Left Column: Video Player -->
+      <section class="col-span-7 flex flex-col gap-4 min-h-0">
+        <!-- Video Player Area -->
+        <div class="flex-col h-full gap-4 flex">
+
+          <!-- Player Card -->
+          <div id="player-container" class="toss-card p-4 pb-5 flex flex-col relative bg-white group">
+            <div id="video-wrapper"
+              class="relative rounded-xl overflow-hidden bg-black aspect-video flex items-center justify-center mb-4 bg-black">
+              <video id="main-video" class="w-full h-full object-contain" playsinline></video>
+              <div id="flash-overlay" class="flash-effect"></div>
+            </div>
+
+            <!-- Custom Controls -->
+            <div id="video-controls" class="flex items-center flex-wrap gap-3 px-2">
+              <button id="btn-play-pause"
+                class="w-10 h-10 rounded-full flex items-center justify-center text-toss-grey800 hover:bg-toss-grey100 transition flex-shrink-0">
+                <i class="ph-fill ph-play text-2xl" id="play-icon"></i>
+              </button>
+
+              <div class="flex-1 flex items-center gap-3">
+                <span id="time-current" class="st12 font-mono text-toss-grey600">00:00:00</span>
+                <input type="range" id="seek-bar" value="0" min="0" step="0.1" class="w-full">
+                <span id="time-duration" class="st12 font-mono text-toss-grey500">00:00:00</span>
+              </div>
+
+              <!-- Playback Rate -->
+              <select id="playback-rate"
+                class="st12 font-mono text-toss-grey600 bg-transparent outline-none cursor-pointer hover:bg-toss-grey100 rounded px-1 flex-shrink-0"
+                title="재생 속도">
+                <option value="0.5">0.5x</option>
+                <option value="0.75">0.75x</option>
+                <option value="1" selected>1.0x</option>
+                <option value="1.25">1.25x</option>
+                <option value="1.5">1.5x</option>
+                <option value="2">2.0x</option>
+              </select>
+
+              <!-- Fullscreen Button -->
+              <button id="btn-fullscreen"
+                class="w-10 h-10 rounded-full flex items-center justify-center text-toss-grey600 hover:bg-toss-grey100 hover:text-toss-grey900 transition flex-shrink-0">
+                <i class="ph-bold ph-corners-out text-xl"></i>
+              </button>
+            </div>
+            <form id="time-jump-form" class="mt-3 px-2 flex flex-wrap items-center gap-2" novalidate>
+              <label for="time-jump-input" class="st12 text-toss-grey600">시간 이동</label>
+              <input id="time-jump-input" type="text" inputmode="numeric" autocomplete="off" placeholder="00:00:00" maxlength="8"
+                aria-describedby="time-jump-help time-jump-error" class="w-28 h-10 px-3 font-mono text-sm rounded-lg border border-toss-grey300 bg-white text-toss-grey900 focus:border-toss-blue outline-none" />
+              <button id="btn-time-jump" type="submit" class="h-10 px-4 rounded-lg bg-toss-blue text-white text-sm font-semibold disabled:opacity-40" disabled>이동</button>
+              <span id="time-jump-help" class="st12">시:분:초 · 숫자 6자리 입력 (123455 → 12:34:55)</span>
+              <span id="time-jump-error" class="w-full text-sm text-toss-red" role="status" aria-live="polite"></span>
+            </form>
+          </div>
+
+          <!-- Capture Button -->
+          <button id="btn-capture"
+            class="w-full toss-card py-6 flex flex-col items-center justify-center border-2 border-transparent hover:border-toss-blue bg-toss-blueWeak text-toss-blue transition group">
+            <div class="flex items-center gap-2 mb-1">
+              <i class="ph-fill ph-camera text-3xl group-hover:scale-110 transition-transform"></i>
+              <span class="t3 font-bold">현재 화면 캡처하기</span>
+            </div>
+            <p class="st12 text-toss-blue opacity-80">단축키: 스페이스바(재생/정지), C 키(캡처) | 전용 하위 폴더에 자동 저장됩니다.</p>
+          </button>
+
+          <!-- Auto Crop Checkbox -->
+          <div class="flex justify-end pr-1 mb-2">
+            <label
+              class="flex items-center gap-2 cursor-pointer text-toss-grey600 hover:text-toss-grey900 select-none transition group">
+              <div class="relative flex items-center justify-center">
+                <input type="checkbox" id="auto-crop-checkbox" checked
+                  class="peer appearance-none w-5 h-5 border border-toss-grey300 rounded cursor-pointer checked:bg-toss-blue checked:border-toss-blue transition">
+                <i
+                  class="ph-bold ph-check text-white absolute text-sm opacity-0 peer-checked:opacity-100 pointer-events-none transition scale-50 peer-checked:scale-100"></i>
+              </div>
+              <span class="st13">검은 여백(레터박스) 자동 제거</span>
+            </label>
+          </div>
+        </div>
+      </section>
+
+      <!-- Right Column: Snapshots Timeline -->
+      <section class="col-span-5 toss-card flex flex-col p-0 overflow-hidden bg-white">
+        <div
+          class="p-6 border-b border-toss-grey100 flex justify-between items-center bg-white z-10 shadow-sm flex-shrink-0">
+          <h3 class="t4 flex items-center gap-2">
+            캡처 목록 <span id="snapshot-count"
+              class="w-6 h-6 rounded-full bg-toss-grey100 text-toss-grey600 t6 flex items-center justify-center">0</span>
+          </h3>
+          <p class="st12 text-toss-grey500">카드를 드래그하여 순서를 변경하세요.</p>
+        </div>
+
+        <div id="snapshot-list" class="flex-1 overflow-y-auto p-6 flex flex-col gap-4 bg-toss-grey50">
+          <!-- Empty State -->
+          <div id="empty-state" class="h-full flex flex-col items-center justify-center text-center opacity-60">
+            <i class="ph-duotone ph-images text-6xl text-toss-grey400 mb-4"></i>
+            <p class="t5 text-toss-grey600">아직 캡처된 화면이 없습니다.</p>
+            <p class="st12 text-toss-grey500 mt-1">영상을 보며 핵심 내용을 캡처해보세요.</p>
+          </div>
+          <!-- Snapshot Cards will be injected here -->
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- Toast Message -->
+  <div id="toast"
+    class="fixed bottom-10 left-1/2 transform -translate-x-1/2 bg-toss-grey800 text-white t6 font-medium px-6 py-3 rounded-full z-[100] shadow-lg transition-all duration-300 opacity-0 pointer-events-none translate-y-4 z-[9999]">
+    메시지
+  </div>
+
+  <!-- Global Loading Overlay -->
+  <div id="global-loader"
+    class="fixed inset-0 bg-white bg-opacity-80 z-[9999] hidden flex-col items-center justify-center backdrop-blur-sm transition-opacity">
+    <i class="ph-bold ph-spinner animate-spin text-5xl text-toss-blue mb-4"></i>
+    <h3 class="t3 font-bold text-toss-grey900">폴더를 탐색하는 중입니다</h3>
+    <p class="st12 text-toss-grey500 mt-2">영상 파일을 찾고 있습니다...</p>
+  </div>
+
+  <!-- Drawing Modal UI -->
+  <div id="drawing-modal" class="fixed inset-0 z-[9999] bg-toss-grey900 bg-opacity-90 flex items-center justify-center p-8 hidden fade-in">
+    <div class="bg-white rounded-2xl w-full max-w-5xl flex flex-col overflow-hidden shadow-2xl relative">
+      <div class="px-6 py-4 border-b border-toss-grey200 flex justify-between items-center bg-toss-grey50">
+        <h2 class="t4 font-bold text-toss-grey900">✏️ 스냅샷 그리기</h2>
+        <div class="flex gap-2">
+          <button id="btn-draw-cancel" class="px-4 py-2 rounded-lg font-medium text-toss-grey600 hover:bg-toss-grey200 transition">취소</button>
+          <button id="btn-draw-save" class="px-4 py-2 rounded-lg font-medium bg-toss-blue text-white hover:bg-toss-blueHover transition">저장하기</button>
+        </div>
+      </div>
+      
+      <div class="flex-1 bg-toss-grey100 p-6 flex flex-col items-center justify-center overflow-auto relative">
+        <div class="relative shadow-sm border border-toss-grey300 bg-white inline-block" id="draw-canvas-wrapper" style="cursor: crosshair;">
+          <canvas id="bg-canvas" class="block max-w-full h-auto max-h-[70vh]"></canvas>
+          <canvas id="draw-canvas" class="absolute top-0 left-0 w-full h-full touch-none block"></canvas>
+        </div>
+      </div>
+
+      <div class="px-6 py-4 border-t border-toss-grey200 bg-white flex justify-center gap-6 items-center">
+        <div class="flex gap-2" id="draw-colors">
+          <button class="w-8 h-8 rounded-full bg-red-500 border-2 border-transparent focus:border-black active-color" data-color="#EF4444"></button>
+          <button class="w-8 h-8 rounded-full bg-blue-500 border-2 border-transparent focus:border-black" data-color="#3B82F6"></button>
+          <button class="w-8 h-8 rounded-full bg-yellow-400 border-2 border-transparent focus:border-black" data-color="#FACC15"></button>
+          <button class="w-8 h-8 rounded-full bg-black border-2 border-transparent focus:border-black" data-color="#000000"></button>
+          <button class="w-8 h-8 rounded-full bg-white border border-toss-grey300 focus:border-black" data-color="#FFFFFF"></button>
+        </div>
+        
+        <div class="w-px h-6 bg-toss-grey300"></div>
+        
+        <div class="flex items-center gap-2">
+          <span class="st13 text-toss-grey600">두께</span>
+          <input type="range" id="draw-size" min="2" max="24" value="4" class="w-24">
+        </div>
+
+        <div class="w-px h-6 bg-toss-grey300"></div>
+        
+        <button id="btn-draw-eraser" class="flex items-center gap-1 px-3 py-1.5 rounded bg-transparent text-toss-grey700 hover:bg-toss-grey200 transition">
+          <i class="ph-bold ph-eraser"></i> 지우개
+        </button>
+
+        <button id="btn-draw-clear" class="flex items-center gap-1 px-3 py-1.5 rounded text-toss-red hover:bg-red-50 transition">
+          전체 초기화
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script src="./renderer.js"></script>
+</body>
+
+</html>

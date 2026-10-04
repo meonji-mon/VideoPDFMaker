@@ -1,0 +1,11 @@
+node_modules/
+dist/
+output/
+graphify-out/
+.codex/
+.DS_Store
+*.log
+*.tmp
+.env
+.env.*
+!.env.example

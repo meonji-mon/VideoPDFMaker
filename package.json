@@ -1,0 +1,72 @@
+{
+    "name": "videopdfmaker",
+    "version": "1.1.0",
+    "description": "Offline video frame capture, notes and PDF export",
+    "author": "MEONJI",
+    "main": "main.js",
+    "scripts": {
+        "start": "electron .",
+        "test": "node --test tests/regression.test.js",
+        "test:electron": "electron tests/electron-smoke.js",
+        "build": "electron-builder",
+        "build:mac": "electron-builder --mac",
+        "build:win": "electron-builder --win --x64"
+    },
+    "build": {
+        "appId": "com.yourname.videopdfmaker",
+        "productName": "Video PDF Maker",
+        "directories": {
+            "output": "dist"
+        },
+        "files": [
+            "index.html",
+            "main.js",
+            "preload.js",
+            "workspace-store.js",
+            "renderer.js",
+            "timecode.js",
+            "assets/**/*",
+            "package.json"
+        ],
+        "mac": {
+            "target": [
+                "dmg",
+                "zip"
+            ],
+            "category": "public.app-category.utilities"
+        },
+        "win": {
+            "target": [
+                {
+                    "target": "nsis",
+                    "arch": [
+                        "x64"
+                    ]
+                },
+                {
+                    "target": "portable",
+                    "arch": [
+                        "x64"
+                    ]
+                }
+            ]
+        },
+        "nsis": {
+            "artifactName": "VideoPDFMaker-${version}-Setup-${arch}.${ext}",
+            "oneClick": false,
+            "allowToChangeInstallationDirectory": true
+        },
+        "portable": {
+            "artifactName": "VideoPDFMaker-${version}-Portable-${arch}.${ext}"
+        }
+    },
+    "devDependencies": {
+        "electron": "^41.2.1",
+        "electron-builder": "^26.8.1"
+    },
+    "dependencies": {
+        "@phosphor-icons/web": "^2.1.2",
+        "jspdf": "^4.2.1",
+        "piexifjs": "^1.0.6"
+    }
+}
