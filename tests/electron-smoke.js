@@ -46,17 +46,22 @@ function pressKey(win, keyCode) {
 }
 
 async function clickElement(win, id) {
-  const { x, y } = await win.webContents.executeJavaScript(`(() => {
+  win.focus();
+  await waitFor(win, 'document.hasFocus()');
+  const { x, y } = await win.webContents.executeJavaScript(`(async () => {
     const element = document.getElementById(${JSON.stringify(id)});
     element.scrollIntoView({ block: 'nearest' });
+    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
     const rect = element.getBoundingClientRect();
     return { x: Math.round(rect.x + rect.width / 2), y: Math.round(rect.y + rect.height / 2) };
   })()`);
   win.webContents.sendInputEvent({ type: 'mouseDown', x, y, button: 'left', clickCount: 1 });
   win.webContents.sendInputEvent({ type: 'mouseUp', x, y, button: 'left', clickCount: 1 });
+  if (id === 'time-jump-input') await waitFor(win, "document.activeElement.id === 'time-jump-input'");
 }
 
 async function typeTime(win, digits) {
+  assert.equal(await win.webContents.executeJavaScript('document.activeElement.id'), 'time-jump-input', 'Native typing requires the time input to have focus');
   for (const keyCode of digits) win.webContents.sendInputEvent({ type: 'char', keyCode });
   await waitFor(win, `document.getElementById('time-jump-input').value === ${JSON.stringify(digits.match(/.{2}/g).join(':'))}`);
 }
@@ -114,10 +119,12 @@ app.whenReady().then(async () => {
     await new Promise(resolve => setTimeout(resolve, 150));
     assert.equal(await evaluate('video.currentTime'), pausedTime);
     assert.equal(await evaluate('video.playbackRate'), 2);
+    const normalViewport = await evaluate('({ width: innerWidth, height: innerHeight })');
     await evaluate("document.getElementById('btn-fullscreen').click()");
     await waitFor(win, '!!document.fullscreenElement');
     await evaluate('document.exitFullscreen()');
-    await waitFor(win, '!document.fullscreenElement');
+    // DOM fullscreen exit can precede the native window/layout transition.
+    await waitFor(win, `!document.fullscreenElement && innerWidth === ${normalViewport.width} && innerHeight === ${normalViewport.height}`);
     await clickElement(win, 'time-jump-input');
     await typeTime(win, '000005');
     pressKey(win, 'Return');
@@ -195,6 +202,17 @@ app.whenReady().then(async () => {
   } catch (error) {
     console.error(error.stack);
     console.error(JSON.stringify({ errors, temporary }));
+    if (win && !win.isDestroyed()) {
+      try {
+        const failureState = await win.webContents.executeJavaScript("({ active: document.activeElement.id || document.activeElement.tagName, input: document.getElementById('time-jump-input').value, fullscreen: Boolean(document.fullscreenElement), width: innerWidth, height: innerHeight, seeking: video.seeking, time: video.currentTime, busy })");
+        console.error(JSON.stringify({ failureState, windowFocused: win.isFocused(), bounds: win.getContentBounds() }));
+        const screenshot = path.join(__dirname, '..', '.codex', 'screenshots', 'SMOKE_failure.png');
+        fs.mkdirSync(path.dirname(screenshot), { recursive: true });
+        fs.writeFileSync(screenshot, (await win.webContents.capturePage()).toPNG());
+      } catch (diagnosticError) {
+        console.error(`Failure diagnostics unavailable: ${diagnosticError.message}`);
+      }
+    }
     app.exit(1);
   }
 });
