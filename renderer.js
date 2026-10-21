@@ -330,6 +330,7 @@ const api = window.videoPDF;
       jumpInput.removeAttribute('aria-invalid');
       jumpError.textContent = '';
     });
+    jumpInput.addEventListener('focus', () => jumpInput.select());
     document.getElementById('time-jump-form').addEventListener('submit', event => {
       event.preventDefault();
       if (busy) return;
@@ -341,11 +342,16 @@ const api = window.videoPDF;
       if (message) {
         jumpError.textContent = message;
         jumpInput.setAttribute('aria-invalid', 'true');
+        jumpInput.focus();
+        jumpInput.select();
         return;
       }
       video.currentTime = seconds;
       jumpInput.removeAttribute('aria-invalid');
       jumpError.textContent = '';
+      jumpInput.value = '';
+      // Enter and button submission must both return focus to playback shortcuts.
+      if (event.currentTarget.contains(document.activeElement)) document.activeElement.blur();
       showToast(`${Timecode.format(seconds)} 위치로 이동했습니다.`);
     });
 

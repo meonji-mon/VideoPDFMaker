@@ -1,0 +1,67 @@
+{
+  "spec_version": "1.0",
+  "project": "VideoPDFMaker",
+  "page": {
+    "id": "video_workspace",
+    "name": "영상 작업 · 시간 이동",
+    "route": null,
+    "source": "renderer.js"
+  },
+  "change": {
+    "summary": "시간 이동 성공 후 입력을 비우고 폼 내부 포커스를 해제한다. Enter와 이동 버튼 모두 재생 단축키로 복귀한다. 잘못된 입력은 입력칸에 포커스를 돌려 전체 선택한다.",
+    "date": "2026-10-21",
+    "status": "implemented"
+  },
+  "data_requirements": [
+    {
+      "ui_element": "#time-jump-input",
+      "field": "targetTime",
+      "type": "string",
+      "required": true,
+      "constraints": "숫자 6자리를 HH:MM:SS로 표시한다. 분·초는 00~59이고 영상 길이를 넘을 수 없다. 성공 후 빈 문자열, 실패 후 기존 값 전체 선택.",
+      "change": "modified",
+      "source_api": "local:Timecode"
+    },
+    {
+      "ui_element": "#time-duration",
+      "field": "duration",
+      "type": "number",
+      "required": true,
+      "constraints": "로드된 영상의 유한한 길이(초).",
+      "change": "unchanged",
+      "source_api": "local:HTMLMediaElement"
+    }
+  ],
+  "actions": [
+    {
+      "trigger": "시간 입력 후 Enter 또는 이동 버튼 클릭",
+      "api": "local:HTMLMediaElement",
+      "api_status": "exists",
+      "request": { "currentTime": "Timecode.parse(targetTime)가 반환한 초" },
+      "response": { "ui": "입력값·오류를 비우고 폼 내부의 현재 활성 요소를 blur한다. 이동 완료 토스트는 기존 동작을 유지하며 seeked 완료를 보장하는 새 API는 추가하지 않는다." },
+      "errors": [
+        { "code": "VIDEO_NOT_READY", "ui": "영상 로딩이 끝난 뒤 이동해주세요. 입력칸을 포커스하고 전체 선택한다." },
+        { "code": "INVALID_TIMECODE", "ui": "시·분·초 형식 안내. 입력칸을 포커스하고 전체 선택한다." },
+        { "code": "OUT_OF_RANGE", "ui": "영상 길이 안의 시간 입력 안내. 입력칸을 포커스하고 전체 선택한다." }
+      ]
+    }
+  ],
+  "states": {
+    "loading": "busy이면 제출을 무시하며 이동 버튼은 작업 중 또는 영상 길이 미확정 시 비활성화된다.",
+    "empty": "이동 성공 후 입력칸은 비워지고 기존 00:00:00 플레이스홀더가 보인다.",
+    "error": "#time-jump-error에 오류를 표시하고 aria-invalid=true를 설정한다. 새 입력 시 오류를 해제한다."
+  },
+  "open_questions": [],
+  "evidence": {
+    "callgraph": [
+      "mcp__callgraph__impact(renderer.js, project_path=/Users/doyoukim/Documents/VideoPDFMaker): LOW; DOM 콜백은 소스 확인으로 보완."
+    ],
+    "grep_checked": [
+      "index.html: #time-jump-form, #time-jump-input, #btn-time-jump, #time-jump-error",
+      "renderer.js: local:Timecode의 formatDigits/parse 및 focus/input/submit 콜백, local:HTMLMediaElement의 duration/currentTime, window keydown의 input/button 예외 확인.",
+      "timecode.js: local:Timecode의 HH:MM:SS 파싱 및 표시 계약 확인.",
+      "preload.js/main.js: 시간 이동은 IPC나 원격 API를 호출하지 않는다. 네이티브 저장 계약 변경 없음.",
+      "tests/electron-smoke.js: 네이티브 숫자 입력, Enter/마우스 제출, 실패 후 덮어쓰기, Space/방향키/C 회귀 검사 추가."
+    ]
+  }
+}

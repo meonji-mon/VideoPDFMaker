@@ -39,6 +39,28 @@ async function waitFor(win, expression, timeout = 10000) {
   }
 }
 
+function pressKey(win, keyCode) {
+  win.webContents.sendInputEvent({ type: 'keyDown', keyCode });
+  if (keyCode === 'Return') win.webContents.sendInputEvent({ type: 'char', keyCode: '\r' });
+  win.webContents.sendInputEvent({ type: 'keyUp', keyCode });
+}
+
+async function clickElement(win, id) {
+  const { x, y } = await win.webContents.executeJavaScript(`(() => {
+    const element = document.getElementById(${JSON.stringify(id)});
+    element.scrollIntoView({ block: 'nearest' });
+    const rect = element.getBoundingClientRect();
+    return { x: Math.round(rect.x + rect.width / 2), y: Math.round(rect.y + rect.height / 2) };
+  })()`);
+  win.webContents.sendInputEvent({ type: 'mouseDown', x, y, button: 'left', clickCount: 1 });
+  win.webContents.sendInputEvent({ type: 'mouseUp', x, y, button: 'left', clickCount: 1 });
+}
+
+async function typeTime(win, digits) {
+  for (const keyCode of digits) win.webContents.sendInputEvent({ type: 'char', keyCode });
+  await waitFor(win, `document.getElementById('time-jump-input').value === ${JSON.stringify(digits.match(/.{2}/g).join(':'))}`);
+}
+
 app.whenReady().then(async () => {
   let win;
   try {
@@ -57,6 +79,34 @@ app.whenReady().then(async () => {
     assert.match(await evaluate("document.getElementById('time-jump-error').textContent"), /영상 길이/);
     await evaluate("document.getElementById('time-jump-input').value='000005'; document.getElementById('time-jump-input').dispatchEvent(new Event('input',{bubbles:true})); document.getElementById('time-jump-form').requestSubmit()");
     await waitFor(win, "!video.seeking && Math.abs(video.currentTime-5)<0.2");
+    win.focus();
+    await clickElement(win, 'time-jump-input');
+    await typeTime(win, '123455');
+    await clickElement(win, 'btn-time-jump');
+    await waitFor(win, "document.activeElement.id === 'time-jump-input' && document.getElementById('time-jump-input').selectionEnd - document.getElementById('time-jump-input').selectionStart === 8");
+    assert.match(await evaluate("document.getElementById('time-jump-error').textContent"), /영상 길이/);
+    // Native typing replaces invalid input without clearing it; both submission paths restore shortcuts.
+    for (const [digits, seconds, submit] of [['000005', 5, 'Return'], ['000008', 8, 'button'], ['000002', 2, 'Return']]) {
+      await typeTime(win, digits);
+      if (submit === 'button') await clickElement(win, 'btn-time-jump');
+      else pressKey(win, submit);
+      await waitFor(win, `!video.seeking && Math.abs(video.currentTime - ${seconds}) < 0.2`);
+      assert.equal(await evaluate("document.getElementById('time-jump-input').value"), '');
+      assert.equal(await evaluate("document.getElementById('time-jump-form').contains(document.activeElement)"), false);
+      pressKey(win, 'Space');
+      await waitFor(win, '!video.paused');
+      pressKey(win, 'Space');
+      await waitFor(win, 'video.paused');
+      pressKey(win, 'Right');
+      await waitFor(win, `!video.seeking && Math.abs(video.currentTime - ${Math.min(12, seconds + 5)}) < 0.3`);
+      pressKey(win, 'Left');
+      await waitFor(win, '!video.seeking');
+      assert.ok(Math.abs(await evaluate('video.currentTime') - Math.min(7, seconds)) < 0.3);
+      await clickElement(win, 'time-jump-input');
+    }
+    await typeTime(win, '000005');
+    pressKey(win, 'Return');
+    await waitFor(win, "!video.seeking && Math.abs(video.currentTime-5)<0.2");
     await evaluate("document.getElementById('playback-rate').value='2'; document.getElementById('playback-rate').dispatchEvent(new Event('change')); video.play()");
     await waitFor(win, 'video.currentTime > 5.5 && !video.paused');
     await evaluate('video.pause()');
@@ -68,7 +118,11 @@ app.whenReady().then(async () => {
     await waitFor(win, '!!document.fullscreenElement');
     await evaluate('document.exitFullscreen()');
     await waitFor(win, '!document.fullscreenElement');
-    await evaluate("document.getElementById('btn-capture').click()");
+    await clickElement(win, 'time-jump-input');
+    await typeTime(win, '000005');
+    pressKey(win, 'Return');
+    await waitFor(win, '!video.seeking && video.readyState >= 2');
+    pressKey(win, 'C');
     await waitFor(win, "snapshots.length === 1 && !busy");
     assert.deepEqual(await evaluate("new Promise(resolve => { const img=new Image(); img.onload=()=>resolve([img.width,img.height]); img.src=snapshots[0].image; })"), [640, 360]);
     const note = '</textarea><img src=x onerror="window.injected=1">\n한글 메모 😊\n' + Array.from({ length: 40 }, (_, i) => `메모 ${i + 1} — 마지막 줄까지 보존합니다.`).join('\n');
@@ -135,7 +189,7 @@ app.whenReady().then(async () => {
       }
       holdQuitForCloseChecks = false;
     }
-    console.log(JSON.stringify({ status: 'PASS', checks: ['isolated renderer', 'local libraries', 'special-character filenames', 'HH:MM:SS formatting', 'duration bounds', 'seek to 5 seconds', 'offline playback advances and pause stops it', '2x playback rate', 'fullscreen enter and exit', 'offline capture and black-border crop', 'HTML treated as text', 'offline multipage PDF', 'Korean/emoji notes', 'reset and restore', 'drawing save and reopen', ...(process.env.VIDEOPDF_KEEP_SMOKE === '1' ? [] : ['missing image note retained, new capture and PDF succeed', 'capture without crop', 'save before close'])], pdf, screenshot, temporary }));
+    console.log(JSON.stringify({ status: 'PASS', checks: ['isolated renderer', 'local libraries', 'special-character filenames', 'HH:MM:SS formatting', 'duration bounds', 'seek to 5 seconds', 'native retyping after invalid and repeated time jumps', 'Enter and mouse submission restore Space and arrow shortcuts', 'C shortcut captures after a time jump', 'offline playback advances and pause stops it', '2x playback rate', 'fullscreen enter and exit', 'offline capture and black-border crop', 'HTML treated as text', 'offline multipage PDF', 'Korean/emoji notes', 'reset and restore', 'drawing save and reopen', ...(process.env.VIDEOPDF_KEEP_SMOKE === '1' ? [] : ['missing image note retained, new capture and PDF succeed', 'capture without crop', 'save before close'])], pdf, screenshot, temporary }));
     if (process.env.VIDEOPDF_KEEP_SMOKE === '1') return;
     app.quit();
   } catch (error) {

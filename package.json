@@ -1,6 +1,6 @@
 {
     "name": "videopdfmaker",
-    "version": "1.1.0",
+    "version": "1.1.1",
     "description": "Offline video frame capture, notes and PDF export",
     "author": "MEONJI",
     "main": "main.js",

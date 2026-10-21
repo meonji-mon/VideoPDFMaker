@@ -1,0 +1,10 @@
+[
+  {
+    "page_id": "video_workspace",
+    "name": "영상 작업 · 시간 이동",
+    "route": null,
+    "file": "video_workspace.json",
+    "status": "implemented",
+    "updated": "2026-10-21"
+  }
+]
