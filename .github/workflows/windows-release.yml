@@ -27,6 +27,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           choco install ffmpeg --yes --no-progress --limit-output
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Reject high and critical dependency vulnerabilities
+        run: npm audit --audit-level=high
       - name: Run regression tests
         run: npm test
       - name: Verify offline Electron flows on Windows
